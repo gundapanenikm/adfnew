@@ -1,0 +1,58 @@
+{
+	"name": "dataflowPOFact",
+	"properties": {
+		"folder": {
+			"name": "PO Dataflows"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "POHeaderLS",
+						"type": "DatasetReference"
+					},
+					"name": "POHeader"
+				},
+				{
+					"dataset": {
+						"referenceName": "PODetailsDataSet",
+						"type": "DatasetReference"
+					},
+					"name": "PODetails"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "AzureSqlTable1",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				},
+				{
+					"dataset": {
+						"referenceName": "AzureSqlTable2POfactAggre",
+						"type": "DatasetReference"
+					},
+					"name": "newFactAgger"
+				}
+			],
+			"transformations": [
+				{
+					"name": "Join1"
+				},
+				{
+					"name": "Select1Sub"
+				},
+				{
+					"name": "DerivedColumn1YearMonth"
+				},
+				{
+					"name": "Aggregate1"
+				}
+			],
+			"script": "source(output(\n\t\tVendorID as integer,\n\t\tOrderDate as timestamp,\n\t\tSubTotal as decimal(19,4),\n\t\tTaxAmt as decimal(19,4),\n\t\tFreight as decimal(19,4),\n\t\tTotalDue as decimal(19,4),\n\t\tPurchaseOrderID as integer,\n\t\tRevisionNumber as byte,\n\t\tStatus as byte,\n\t\tEmployeeID as integer,\n\t\tShipMethodID as integer,\n\t\tShipDate as timestamp,\n\t\tModifiedDate as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> POHeader\nsource(output(\n\t\tPurchaseOrderID as integer,\n\t\tPurchaseOrderDetailID as integer,\n\t\tDueDate as timestamp,\n\t\tOrderQty as short,\n\t\tProductID as integer,\n\t\tUnitPrice as decimal(19,4),\n\t\tLineTotal as decimal(19,4),\n\t\tReceivedQty as decimal(8,2),\n\t\tRejectedQty as decimal(8,2),\n\t\tStockedQty as decimal(9,2),\n\t\tModifiedDate as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> PODetails\nPOHeader, PODetails join(POHeader@PurchaseOrderID == PODetails@PurchaseOrderID,\n\tjoinType:'inner',\n\tbroadcast: 'auto')~> Join1\nJoin1 select(mapColumn(\n\t\tVendorID,\n\t\tOrderDate,\n\t\tSubTotal,\n\t\tOrderQty,\n\t\tProductID,\n\t\tUnitPrice,\n\t\tReceivedQty,\n\t\tRejectedQty,\n\t\tStockedQty\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> Select1Sub\nSelect1Sub derive(Year = year(OrderDate),\n\t\tMonth = month(OrderDate)) ~> DerivedColumn1YearMonth\nDerivedColumn1YearMonth aggregate(groupBy(VendorID,\n\t\tProductID,\n\t\tYear,\n\t\tMonth),\n\tSubTotal = sum(SubTotal),\n\t\tOrderQty = sum(OrderQty),\n\t\tUnitprice = sum(UnitPrice),\n\t\t{Received Qty} = sum(ReceivedQty),\n\t\tRejectedQty = sum(RejectedQty),\n\t\tStockedQty = sum(StockedQty)) ~> Aggregate1\nSelect1Sub sink(allowSchemaDrift: true,\n\tvalidateSchema: true,\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'table',\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1\nAggregate1 sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'table',\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> newFactAgger"
+		}
+	}
+}

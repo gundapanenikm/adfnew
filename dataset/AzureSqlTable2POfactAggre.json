@@ -1,0 +1,17 @@
+{
+	"name": "AzureSqlTable2POfactAggre",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabase1DW",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": "",
+			"table": "factpoaggregate"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
